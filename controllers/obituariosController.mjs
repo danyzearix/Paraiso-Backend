@@ -1,4 +1,4 @@
-import Obituarios from "../models/obituariosSchema.js"
+import Obituarios from "../models/obituariosSchema.mjs"
 
 
 const obtenerObituarios = async (req, res) => {

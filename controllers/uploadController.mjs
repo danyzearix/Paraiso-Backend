@@ -1,5 +1,5 @@
 import XLSX from 'xlsx';
-import Obituarios from '../models/obituariosSchema.js';
+import Obituarios from '../models/obituariosSchema.mjs';
 
 const uploadFile = async (req, res) => {
   try {

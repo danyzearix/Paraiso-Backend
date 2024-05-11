@@ -3,10 +3,15 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import connectDB from './config/mongoConfig.js';
-import obituariosRoutes from "./routes/obituariosRoutes.js"
-import uploadRoutes from "./routes/uploadRoutes.js"
-import usuariosRoutes from "./routes/usuariosRoutes.js";
+import connectDB from './config/mongoConfig.mjs';
+import obituariosRoutes from "./routes/obituariosRoutes.mjs"
+import uploadRoutes from "./routes/uploadRoutes.mjs"
+import usuariosRoutes from "./routes/usuariosRoutes.mjs";
+
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+
 
 //Middlewares
 const app = express();
@@ -24,6 +29,15 @@ app.use(cors());
 // Parsear el cuerpo de las solicitudes a JSON
 app.use(bodyParser.json());
 
+// Obtén la ruta del archivo actual a partir de import.meta.url
+const __filename = fileURLToPath(import.meta.url);
+// Usa path.dirname para obtener el directorio del archivo actual
+const __dirname = path.dirname(__filename);
+
+// Ahora puedes usar __dirname para construir rutas de manera segura
+const directory = path.join(__dirname, 'public', 'uploads');
+
+console.log(directory); // Verifica que la ruta es correcta
 //Usar carpeta public
 app.use( express.static("public"));
 

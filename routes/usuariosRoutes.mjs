@@ -1,6 +1,6 @@
 import express from "express";
 const router = express.Router();
-import { registrarUsuarios, loginUsuarios } from "../controllers/usuariosController.js";
+import { registrarUsuarios, loginUsuarios } from "../controllers/usuariosController.mjs";
 
 //Registrar usuarios
 router.post("/registro", registrarUsuarios);

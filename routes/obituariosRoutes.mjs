@@ -1,6 +1,6 @@
 import express from "express";
 const router = express.Router();
-import {obtenerObituarios, guardarObituarios} from "../controllers/obituariosController.js"
+import {obtenerObituarios, guardarObituarios} from "../controllers/obituariosController.mjs"
 
 //Obtener datos 
 router.get("/", obtenerObituarios);
