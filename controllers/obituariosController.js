@@ -1,5 +1,5 @@
 import Obituarios from "../models/obituariosSchema.js"
-import { DateTime } from 'luxon';
+
 
 const obtenerObituarios = async (req, res) => {
   try {

@@ -12,7 +12,7 @@ import usuariosRoutes from "./routes/usuariosRoutes.js";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-
+console.log(PORT)
 
 //Llamar funcion que conecta a la DB 
 connectDB();
@@ -48,5 +48,10 @@ function verifyToken(req, res, next) {
 }
 
 app.use('/FormularioObituarios', verifyToken);
+
+// Iniciar el servidor y escuchar en el puerto especificado
+app.listen(PORT, () => {
+  console.log(`Servidor ejecutándose en http://localhost:${PORT}`);
+});
 
 
