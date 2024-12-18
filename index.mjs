@@ -7,6 +7,8 @@ import connectDB from './config/mongoConfig.mjs';
 import obituariosRoutes from "./routes/obituariosRoutes.mjs"
 import uploadRoutes from "./routes/uploadRoutes.mjs"
 import usuariosRoutes from "./routes/usuariosRoutes.mjs";
+import misaRoutes from "./routes/misaRoutes.mjs";
+import horarioRoutes from "./routes/horarioRoutes.mjs";
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -45,6 +47,8 @@ app.use( express.static("public"));
 app.use("/api/obituarios", obituariosRoutes)
 app.use("/api", uploadRoutes);
 app.use("/api/usuarios", usuariosRoutes)
+app.use("/api/misas", misaRoutes);
+app.use("/api/horarios", horarioRoutes);
 
 
 //Middleware para verificar token jeje
