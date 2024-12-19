@@ -87,15 +87,25 @@ export const generarHorarios = async (req, res) => {
 
 // Reservar un horario
 export const reservarHorario = async (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params; // ID del horario
   const { usuarioId, nombre, email, metodoPago, monto } = req.body;
 
   try {
+    // Buscar el horario por ID
     const horario = await Horario.findById(id);
-    if (!horario || horario.estado !== "libre") {
-      return res.status(400).json({ message: "El horario no está disponible" });
+
+    // Validar que exista y que esté en estado "libre"
+    if (!horario) {
+      return res.status(404).json({ message: "El horario no existe" });
     }
 
+    if (horario.estado !== "libre") {
+      return res
+        .status(400)
+        .json({ message: `El horario ya está ${horario.estado} y no puede ser reservado` });
+    }
+
+    // Actualizar estado y añadir la reserva
     horario.estado = "reservado";
     horario.reservas.push({
       usuarioId,
@@ -104,9 +114,11 @@ export const reservarHorario = async (req, res) => {
       pago: { metodo: metodoPago, monto, estado: "pagado" },
     });
 
+    // Guardar cambios
     await horario.save();
     res.status(200).json({ message: "Horario reservado con éxito", horario });
   } catch (error) {
+    console.error("Error al reservar el horario:", error);
     res.status(500).json({ message: "Error al reservar el horario", error });
   }
 };
