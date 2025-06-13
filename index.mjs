@@ -28,8 +28,16 @@ console.log(PORT)
 connectDB();
 
 // Permitir solicitudes desde cualquier origen
-app.use(cors());
-// O permitir solicitudes solo desde el origen específico donde se encuentra tu aplicación React
+
+// 1. Permitir CORS *para tu dominio*:
+app.use(cors({
+  origin: [
+    'https://admin.elparaisoparquecementerio.com',
+    'https://paraiso-node-api-0c5186e80e32.herokuapp.com'
+  ]
+}));
+
+app.use(express.json());// O permitir solicitudes solo desde el origen específico donde se encuentra tu aplicación React
 
 // Parsear el cuerpo de las solicitudes a JSON
 app.use(bodyParser.json());

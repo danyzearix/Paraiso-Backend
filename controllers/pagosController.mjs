@@ -150,3 +150,37 @@ export const getReceipt = async (req, res) => {
     return res.status(500).json({ message: 'Error obteniendo recibo' });
   }
 };
+
+export const getPaymentResponse = async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    // Busca el pago y luego el horario asociado:
+    const pago = await Pago.findOne({ orderNumber });
+    if (!pago) return res.status(404).json({ message: 'Pago no encontrado' });
+
+    // Ahora busca el Horario actualizado
+    const horario = await Horario.findById(pago.horarioId).lean();
+    if (!horario) return res.status(404).json({ message: 'Horario no encontrado' });
+
+    // Prepara la info que necesitas en el PDF (nombre comprador, fecha, etc)
+    return res.json({
+      orderNumber: pago.orderNumber,
+      usuarioId: pago.usuarioId,
+      nombreComprador: pago.nombreComprador,
+      email: pago.email,
+      celular: pago.celular,
+      direccionResidencia: pago.direccionResidencia,
+      tipoIdentificacion: pago.tipoIdentificacion,
+      numeroDocumento: pago.numeroDocumento,
+      nombreDestinatario: pago.nombreDestinatario,
+      intencionMisa: pago.intencionMisa,
+      metodoPago: pago.metodoPago,
+      monto: pago.monto,
+      fecha: horario.fecha,
+      misaId: horario.misaId
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error interno' });
+  }
+};

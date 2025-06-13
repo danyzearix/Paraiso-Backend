@@ -11,5 +11,8 @@ router.post('/webhook', confirmationWebhook);
 //Enviar numero de la orden para imprimir recibo
 router.get('/receipt/:orderNumber', getReceipt);
 
+//Obtener respuesta de la orden con epayco
+router.get('/response/:orderNumber', getPaymentResponse);
+
 
 export default router;
