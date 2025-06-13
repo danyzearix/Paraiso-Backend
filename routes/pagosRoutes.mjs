@@ -1,5 +1,5 @@
 import express from 'express';
-import { initPayment, confirmationWebhook, getReceipt } from '../controllers/pagosController.mjs';
+import { initPayment, confirmationWebhook, getReceipt, getPaymentResponse } from '../controllers/pagosController.mjs';
 const router = express.Router();
 
 // Inicia un WebCheckout y devuelve la URL de pago
