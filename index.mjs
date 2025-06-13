@@ -9,6 +9,9 @@ import uploadRoutes from "./routes/uploadRoutes.mjs"
 import usuariosRoutes from "./routes/usuariosRoutes.mjs";
 import misaRoutes from "./routes/misaRoutes.mjs";
 import horarioRoutes from "./routes/horarioRoutes.mjs";
+import pagosRoutes from './routes/pagosRoutes.mjs';
+import { confirmationWebhook } from './controllers/pagosController.mjs';
+import reservasRoutes from './routes/reservasRoutes.mjs';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -43,12 +46,22 @@ console.log(directory); // Verifica que la ruta es correcta
 //Usar carpeta public
 app.use( express.static("public"));
 
+// Parsear el cuerpo de las solicitudes a JSON
+app.use(bodyParser.json());
+
+// 👉 Añade esto para que lea form data de ePayco (x-www-form-urlencoded)
+app.use(bodyParser.urlencoded({ extended: true }));
+
 //Rutas 
 app.use("/api/obituarios", obituariosRoutes)
 app.use("/api", uploadRoutes);
 app.use("/api/usuarios", usuariosRoutes)
 app.use("/api/misas", misaRoutes);
 app.use("/api/horarios", horarioRoutes);
+app.use('/api/pagos', pagosRoutes);
+app.post('/api/pagos/webhook', confirmationWebhook);
+app.use('/api/horarios', horarioRoutes);
+app.use('/api/reservas', reservasRoutes);
 
 
 //Middleware para verificar token jeje

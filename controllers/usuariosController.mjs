@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 
 const registrarUsuarios = async (req, res) => {
     try {
-        const { nombre, email, password } = req.body;
+        const { nombre, email, password, direccionResidencia } = req.body;
         console.log(req.body);
     
         // Verificar si el usuario ya existe
@@ -22,7 +22,8 @@ const registrarUsuarios = async (req, res) => {
         const usuario = new Usuarios({
           nombre,
           email,
-          password: hashedPassword
+          password: hashedPassword,
+          direccionResidencia
         });
     
         // Guardar el usuario en la base de datos

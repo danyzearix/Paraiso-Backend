@@ -14,6 +14,10 @@ const usuariosSchema = new mongoose.Schema({
     password: {
       type: String,
       required: true
+    },
+    direccionResidencia: {
+      type: String,
+      required: true
     }
   });
   

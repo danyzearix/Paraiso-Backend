@@ -2,6 +2,7 @@
 import Horario from "../models/horarioSchema.mjs";
 import Misa from "../models/misaSchema.mjs";
 import moment from "moment-timezone";
+
 import "moment/locale/es.js"; // Importar el idioma español
 moment.locale("es"); // Configurar moment para usar español
 
@@ -88,7 +89,7 @@ export const generarHorarios = async (req, res) => {
 // Reservar un horario
 export const reservarHorario = async (req, res) => {
   const { id } = req.params; // ID del horario
-  const { usuarioId, nombre, email, metodoPago, monto } = req.body;
+  const { usuarioId, nombre, email, metodoPago, monto, direccionResidencia, servicioId } = req.body;
 
   try {
     // Buscar el horario por ID
@@ -111,6 +112,8 @@ export const reservarHorario = async (req, res) => {
       usuarioId,
       nombre,
       email,
+      direccionResidencia, // Verifica que este campo esté llegando desde el frontend
+      servicioId,          // Verifica que este campo esté llegando desde el frontend
       pago: { metodo: metodoPago, monto, estado: "pagado" },
     });
 
@@ -120,5 +123,94 @@ export const reservarHorario = async (req, res) => {
   } catch (error) {
     console.error("Error al reservar el horario:", error);
     res.status(500).json({ message: "Error al reservar el horario", error });
+  }
+};
+
+export const obtenerHorarios = async (req, res) => {
+  try {
+    const { misaId } = req.params;
+    const horarios = await Horario.find({ misaId, estado: 'libre' }).lean();
+    res.json(horarios);
+  } catch (err) {
+    console.error('obtenerHorarios error:', err);
+    res.status(500).json({ message: 'Error obteniendo horarios' });
+  }
+};
+
+export const cancelarReserva = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const horario = await Horario.findById(id);
+    if (!horario) return res.status(404).json({ message: 'Horario no encontrado' });
+
+    const now = new Date();
+    const diffHrs = (horario.fecha - now) / (1000 * 60 * 60);
+    if (diffHrs > 24) {
+      return res.status(400).json({ message: 'Solo se puede cancelar con menos de 24h de anticipación' });
+    }
+
+    horario.estado = 'libre';
+    horario.reservas = [];  // borramos todas las reservas asociadas
+    await horario.save();
+
+    res.json({ message: 'Reserva cancelada correctamente' });
+  } catch (err) {
+    console.error('cancelarReserva error:', err);
+    res.status(500).json({ message: 'Error cancelando reserva' });
+  }
+};
+
+export const getSlotsReservados = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const filtro = { estado: 'reservado' };
+    if (from && to) {
+      const desde = new Date(from);
+      const hasta = new Date(to);
+      if (!isNaN(desde) && !isNaN(hasta)) {
+        filtro.fecha = { $gte: desde, $lte: hasta };
+      }
+    }
+
+    const slotsReservados = await Horario.aggregate([
+      { $match: filtro },
+      { $unwind: { path: '$reservas', preserveNullAndEmptyArrays: false } },
+      {
+        $lookup: {
+          from: 'pagos',
+          localField: '_id',
+          foreignField: 'horarioId',
+          as: 'pago_info'
+        }
+      },
+      {
+        $addFields: {
+          'reservas.direccionResidencia': {
+            $cond: [
+              { $gt: [{ $size: '$pago_info' }, 0] },
+              { $arrayElemAt: ['$pago_info.direccionResidencia', 0] },
+              '$reservas.direccionResidencia'
+            ]
+          },
+          'reservas.servicioId': {
+            $cond: [
+              { $gt: [{ $size: '$pago_info' }, 0] },
+              { $arrayElemAt: ['$pago_info.servicioId', 0] },
+              '$reservas.servicioId'
+            ]
+          },
+          // Inyectamos misaId y fecha dentro de reservas
+          'reservas.misaId': { $toString: '$misaId' },
+          'reservas.fecha': '$fecha'
+        }
+      },
+      // Proyectamos sólo el subdocumento reservas
+      { $project: { reservas: 1 } }
+    ]);
+
+    return res.json(slotsReservados);
+  } catch (error) {
+    console.error('getSlotsReservados error:', error);
+    res.status(500).json({ message: 'Error obteniendo slots reservados' });
   }
 };

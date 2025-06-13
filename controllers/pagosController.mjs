@@ -1,78 +1,152 @@
-import epayco from "../config/epayco.mjs";
-import Horario from "../models/horarioSchema.mjs";
-import crypto from "crypto";
+// controllers/pagosController.mjs
 
-// Iniciar una transacción con ePayco
-export const iniciarTransaccion = async (req, res) => {
-    const { idReserva, monto, nombre, email } = req.body;
+import Pago from '../models/pagoSchema.mjs';
+import Horario from '../models/horarioSchema.mjs';
+import moment from 'moment';
+import { generarOrderNumber } from '../utils/counters.mjs';
 
-    try {
-        const datosPago = {
-            token_card: "TOKEN_DE_TARJETA", // Esto lo proporciona el frontend
-            customer_id: "ID_CLIENTE",      // Generado si ya registraste al cliente en ePayco
-            description: `Reserva de misa ${idReserva}`,
-            value: monto,
-            currency: "COP",
-            email: email,
-            name: nombre,
-            url_response: "https://tu-sitio.com/pago-exitoso",
-            url_confirmation: "https://tu-sitio.com/api/pagos/confirmacion",
-            method_confirmation: "POST"
-        };
+/**
+ * POST /api/pagos/init
+ * Genera un orderNumber, crea un pago con estado "pendiente" y lo devuelve al cliente.
+ */
+export const initPayment = async (req, res) => {
+  console.log('🛫 initPayment req.body:', req.body);
+  try {
+    const {
+      monto,
+      horarioId,
+      usuarioId,
+      email,
+      nombreComprador,
+      celular,
+      direccionResidencia,
+      tipoIdentificacion,
+      numeroDocumento,
+      nombreDestinatario,
+      intencionMisa,
+      metodoPago
+    } = req.body;
 
-        const respuesta = await epayco.charge.create(datosPago);
+    // 1) Generar orderNumber
+    const orderNumber = await generarOrderNumber('pago');
+    console.log('🔢 orderNumber generado:', orderNumber);
 
-        res.status(200).json({
-            message: "Transacción creada con éxito",
-            urlPago: respuesta.data.url_payment
-        });
-    } catch (error) {
-        console.error("Error al crear la transacción:", error);
-        res.status(500).json({ message: "Error al crear la transacción", error });
-    }
+    // 2) Crear registro de pago pendiente
+    const nuevoPago = await Pago.create({
+      orderNumber,
+      horarioId,
+      usuarioId,
+      monto,
+      email,
+      nombreComprador,
+      celular,
+      direccionResidencia,
+      tipoIdentificacion,
+      numeroDocumento,
+      nombreDestinatario,
+      intencionMisa,
+      metodoPago,
+      estadoPago: 'pendiente'
+    });
+    console.log('💾 Pago creado en BD:', nuevoPago);
+
+    // 3) Devolver sólo orderNumber
+    return res.json({ orderNumber });
+  } catch (error) {
+    console.error('🔥 initPayment error:', error);
+    return res.status(500).json({ message: 'Error iniciando el pago', error: error.message });
+  }
 };
 
-// Confirmar una transacción desde ePayco
-export const confirmarPago = async (req, res) => {
-    const { x_signature, x_ref_payco, x_transaction_id, x_amount, x_currency_code, x_response } = req.body;
+/**
+ * POST /api/pagos/webhook
+ * Webhook que actualiza el estado del pago y reserva el horario si se confirma.
+ */
+export const confirmationWebhook = async (req, res) => {
+  console.log('📬 confirmationWebhook payload:', req.body);
+  const payload = req.body;
+  try {
+    // Extraer invoice
+    const invoice = payload.x_id_invoice || payload.x_id_factura;
 
-    try {
-        // Verificar la firma
-        const firmaValida = verificarFirma(
-            x_signature,
-            x_ref_payco,
-            x_transaction_id,
-            x_amount,
-            x_currency_code
-        );
-
-        if (!firmaValida) {
-            return res.status(400).json({ message: "Firma no válida" });
-        }
-
-        // Manejar el estado del pago
-        if (x_response === "Aceptada") {
-            const reserva = await Horario.findByIdAndUpdate(
-                x_ref_payco, // Este debe coincidir con el ID de la reserva
-                { estado: "reservado" },
-                { new: true }
-            );
-
-            return res.status(200).json({ message: "Pago confirmado", reserva });
-        }
-
-        res.status(400).json({ message: `El pago no fue exitoso: ${x_response}` });
-    } catch (error) {
-        console.error("Error al confirmar el pago:", error);
-        res.status(500).json({ message: "Error al confirmar el pago", error });
+    // Encontrar pago por orderNumber
+    const pago = await Pago.findOne({ orderNumber: invoice });
+    if (!pago) {
+      console.warn('Pago no encontrado para orderNumber:', invoice);
+      return res.status(404).send('Pago no encontrado');
     }
+
+    // Actualizar estadoPago
+    pago.estadoPago = payload.x_response === 'Aceptada' ? 'confirmado' : 'rechazado';
+    await pago.save();
+
+    // Si confirmado, reservar horario
+    if (pago.estadoPago === 'confirmado') {
+      await Horario.findByIdAndUpdate(
+        pago.horarioId,
+        {
+          estado: 'reservado',
+          $push: {
+            reservas: {
+              usuarioId:          pago.usuarioId,
+              nombreComprador:    pago.nombreComprador,
+              email:              pago.email,
+              celular:            pago.celular,
+              tipoIdentificacion: pago.tipoIdentificacion,
+              numeroDocumento:    pago.numeroDocumento,
+              nombreDestinatario: pago.nombreDestinatario,
+              intencionMisa:      pago.intencionMisa,
+              pago: {
+                metodo: pago.metodoPago,
+                monto:  pago.monto,
+                estado: 'pagado'
+              }
+            }
+          }
+        }
+      );
+    }
+
+    return res.status(200).send('OK');
+  } catch (error) {
+    console.error('⚠ confirmationWebhook error:', error);
+    return res.status(500).send('Error procesando webhook');
+  }
 };
 
-// Función auxiliar para verificar la firma de seguridad
-const verificarFirma = (signature, ref_payco, transaction_id, amount, currency) => {
-    const signatureLocal = crypto
-        .createHash("sha256")
-        .update(`TU_CUST_ID~TU_API_KEY~${ref_payco}~${transaction_id}~${amount}~${currency}`)
-        .digest("hex");
-    return signature === signatureLocal;
+export const getReceipt = async (req, res) => {
+  const { orderNumber } = req.params;
+  try {
+    // 1) Encuentra el Pago
+    const pago = await Pago.findOne({ orderNumber });
+    if (!pago) return res.status(404).json({ message: 'Pago no encontrado' });
+
+    // 2) Obtén el horario reservado
+    const horario = await Horario.findById(pago.horarioId);
+    if (!horario) return res.status(404).json({ message: 'Horario no encontrado' });
+
+    // 3) Formatea fecha/hora para el PDF
+    const fechaHuman = moment(horario.fecha).format('YYYY-MM-DD');
+    const horaHuman  = moment(horario.fecha).format('HH:mm');
+
+    // 4) Devuelve un JSON con todo lo necesario
+    return res.json({
+      orderNumber,
+      fechaHuman,
+      horaHuman,
+      nombreComprador: pago.nombreComprador,
+      email: pago.email,
+      celular: pago.celular,
+      numeroDocumento: pago.numeroDocumento,
+      nombreDestinatario: pago.nombreDestinatario,
+      intencionMisa: pago.intencionMisa,
+      metodoPago: pago.metodoPago,
+      monto: pago.monto,
+      direccionResidencia: pago.direccionResidencia,
+      servicioId: pago.servicioId
+    });
+  } catch (err) {
+    console.error('getReceipt error:', err);
+    return res.status(500).json({ message: 'Error obteniendo recibo' });
+  }
 };
